@@ -1,0 +1,321 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Sorting Visualizer</title>
+
+<style>
+    body {
+        margin: 0;
+        font-family: Arial;
+        background: #111;
+        color: white;
+        text-align: center;
+    }
+
+    h1 {
+        margin: 20px;
+    }
+
+    #controls {
+        margin-bottom: 20px;
+    }
+
+    button, select, input {
+        padding: 8px 12px;
+        margin: 5px;
+        font-size: 14px;
+    }
+
+    #array {
+        display: flex;
+        align-items: flex-end;
+        justify-content: center;
+        height: 400px;
+        margin: 20px;
+    }
+
+    .bar {
+        width: 6px;
+        margin: 1px;
+        background: turquoise;
+    }
+
+    .compare {
+        background: red;
+    }
+
+    .swap {
+        background: orange;
+    }
+
+    .sorted {
+        background: limegreen;
+    }
+</style>
+</head>
+
+<body>
+
+<h1>Sorting Visualizer</h1>
+
+<div id="controls">
+    <button onclick="generateArray()">Generate</button>
+
+    <select id="algorithm">
+        <option value="bubble">Bubble</option>
+        <option value="selection">Selection</option>
+        <option value="insertion">Insertion</option>
+        <option value="quick">Quick</option>
+        <option value="merge">Merge</option>
+    </select>
+
+    <button onclick="startSort()">Sort</button>
+
+    Speed:
+    <input type="range" id="speed" min="1" max="100" value="30">
+</div>
+
+<div id="array"></div>
+
+<script>
+
+// ---------------- GLOBALS ----------------
+let array = [];
+let isSorting = false;
+
+// ---------------- ARRAY GENERATION ----------------
+function generateArray(size = 80) {
+    if (isSorting) return;
+
+    array = [];
+    for (let i = 0; i < size; i++) {
+        array.push(Math.floor(Math.random() * 350) + 10);
+    }
+
+    renderArray();
+}
+
+// ---------------- RENDER ----------------
+function renderArray(highlight = {}) {
+    const container = document.getElementById("array");
+    container.innerHTML = "";
+
+    array.forEach((value, index) => {
+        const bar = document.createElement("div");
+        bar.classList.add("bar");
+        bar.style.height = value + "px";
+
+        if (highlight.compare?.includes(index))
+            bar.classList.add("compare");
+
+        if (highlight.swap?.includes(index))
+            bar.classList.add("swap");
+
+        container.appendChild(bar);
+    });
+}
+
+// ---------------- ANIMATION ----------------
+function sleep(ms) {
+    return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+async function animate(steps) {
+    isSorting = true;
+
+    for (let step of steps) {
+        let highlight = {};
+
+        if (step.type === "compare") {
+            highlight.compare = [step.i, step.j];
+        }
+
+        if (step.type === "swap") {
+            highlight.swap = [step.i, step.j];
+            [array[step.i], array[step.j]] =
+                [array[step.j], array[step.i]];
+        }
+
+        if (step.type === "overwrite") {
+            array[step.index] = step.value;
+        }
+
+        renderArray(highlight);
+
+        let speed = document.getElementById("speed").value;
+        await sleep(101 - speed);
+    }
+
+    renderArray();
+    isSorting = false;
+}
+
+// ---------------- START SORT ----------------
+function startSort() {
+    if (isSorting) return;
+
+    const algo = document.getElementById("algorithm").value;
+    let steps = [];
+
+    if (algo === "bubble") steps = bubbleSortSteps(array);
+    if (algo === "selection") steps = selectionSortSteps(array);
+    if (algo === "insertion") steps = insertionSortSteps(array);
+    if (algo === "quick") steps = quickSortSteps(array);
+    if (algo === "merge") steps = mergeSortSteps(array);
+
+    animate(steps);
+}
+
+// ---------------- SORTING ALGORITHMS ----------------
+
+function bubbleSortSteps(arr) {
+    const a = [...arr];
+    const steps = [];
+    let swapping = true;
+    let end = a.length;
+
+    while (swapping) {
+        swapping = false;
+        for (let i = 1; i < end; i++) {
+            steps.push({ type: "compare", i: i - 1, j: i });
+            if (a[i] < a[i - 1]) {
+                swapping = true;
+                steps.push({ type: "swap", i: i - 1, j: i });
+                [a[i], a[i - 1]] = [a[i - 1], a[i]];
+            }
+        }
+        end--;
+    }
+    return steps;
+}
+
+function selectionSortSteps(arr) {
+    const a = [...arr];
+    const steps = [];
+
+    for (let i = 0; i < a.length; i++) {
+        let min = i;
+        for (let j = i + 1; j < a.length; j++) {
+            steps.push({ type: "compare", i: min, j });
+            if (a[j] < a[min]) min = j;
+        }
+        if (min !== i) {
+            steps.push({ type: "swap", i, j: min });
+            [a[i], a[min]] = [a[min], a[i]];
+        }
+    }
+    return steps;
+}
+
+function insertionSortSteps(arr) {
+    const a = [...arr];
+    const steps = [];
+
+    for (let i = 1; i < a.length; i++) {
+        let j = i;
+        while (j > 0) {
+            steps.push({ type: "compare", i: j - 1, j });
+            if (a[j - 1] > a[j]) {
+                steps.push({ type: "swap", i: j - 1, j });
+                [a[j], a[j - 1]] = [a[j - 1], a[j]];
+                j--;
+            } else break;
+        }
+    }
+    return steps;
+}
+
+function quickSortSteps(arr) {
+    const a = [...arr];
+    const steps = [];
+
+    function quickSort(low, high) {
+        if (low < high) {
+            const p = partition(low, high);
+            quickSort(low, p - 1);
+            quickSort(p + 1, high);
+        }
+    }
+
+    function partition(low, high) {
+        const pivotIndex =
+            Math.floor(Math.random() * (high - low + 1)) + low;
+
+        steps.push({ type: "swap", i: pivotIndex, j: high });
+        [a[pivotIndex], a[high]] =
+            [a[high], a[pivotIndex]];
+
+        const pivot = a[high];
+        let i = low - 1;
+
+        for (let j = low; j < high; j++) {
+            steps.push({ type: "compare", i: j, j: high });
+            if (a[j] < pivot) {
+                i++;
+                steps.push({ type: "swap", i, j });
+                [a[i], a[j]] = [a[j], a[i]];
+            }
+        }
+
+        steps.push({ type: "swap", i: i + 1, j: high });
+        [a[i + 1], a[high]] =
+            [a[high], a[i + 1]];
+
+        return i + 1;
+    }
+
+    quickSort(0, a.length - 1);
+    return steps;
+}
+
+function mergeSortSteps(arr) {
+    const a = [...arr];
+    const steps = [];
+
+    function mergeSort(start, end) {
+        if (end - start < 2) return;
+        const mid = Math.floor((start + end) / 2);
+        mergeSort(start, mid);
+        mergeSort(mid, end);
+        merge(start, mid, end);
+    }
+
+    function merge(start, mid, end) {
+        const left = a.slice(start, mid);
+        const right = a.slice(mid, end);
+        let i = 0, j = 0, k = start;
+
+        while (i < left.length && j < right.length) {
+            steps.push({ type: "compare", i: start + i, j: mid + j });
+            if (left[i] <= right[j]) {
+                steps.push({ type: "overwrite", index: k, value: left[i] });
+                a[k++] = left[i++];
+            } else {
+                steps.push({ type: "overwrite", index: k, value: right[j] });
+                a[k++] = right[j++];
+            }
+        }
+
+        while (i < left.length) {
+            steps.push({ type: "overwrite", index: k, value: left[i] });
+            a[k++] = left[i++];
+        }
+
+        while (j < right.length) {
+            steps.push({ type: "overwrite", index: k, value: right[j] });
+            a[k++] = right[j++];
+        }
+    }
+
+    mergeSort(0, a.length);
+    return steps;
+}
+
+// Generate initial array
+generateArray();
+
+</script>
+
+</body>
+</html>
